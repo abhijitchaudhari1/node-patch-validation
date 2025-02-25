@@ -119,12 +119,15 @@ function validate_istio_ingress_gateway_endpoint_connectivity() {
   local return_code=0
   local expected_code=404
   local endpoint_found=false
+  local istio_ingress_gw_http_target_port
+
+  istio_ingress_gw_http_target_port="$(kubectl -n istio-system get svc  istio-ingressgateway -o json | jq -r '.spec.ports[] | select(.port == 80).targetPort')"
 
   for i in $(kubectl -n istio-system get endpoints istio-ingressgateway  -o json | jq -r '.subsets[].addresses[] | .nodeName + "=" + .ip'); do
     endpoint_found=true
     nodeName="$(echo "${i}" | cut -d'=' -f1)"
     podIP="$(echo "${i}" | cut -d'=' -f2)"
-    http_code="$(curl -m 10 -s -o /dev/null -w "%{http_code}" "${podIP}")"
+    http_code="$(curl -m 10 -s -o /dev/null -w "%{http_code}" "${podIP}:${istio_ingress_gw_http_target_port}")"
     if [[ "$http_code" -ne 404 ]]; then
       return_code=1
       log_to_file "ERROR" "Unexpected http code ${http_code} received for istio ingress-gateway endpoint IP ${podIP} on node ${nodeName}"
